@@ -51,7 +51,7 @@ async def execute(sql, args):
     log(sql)
     global __pool
 
-    with (await __pool) as coon:
+    with (await __pool) as conn:
         try:
             cur = await conn.cursor()
             await cur.execute(sql.replace('?', '%s'), args)
