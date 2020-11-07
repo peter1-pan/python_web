@@ -44,7 +44,7 @@ async def select(sql, args, size=None):
     await cur.close()
     # 日志: 提示返回了多少行
     logging.info('rows returned: {}'.format(len(rs)))
-    return res  # 返回的是一个列表
+    return rs  # 返回的是一个列表
 
 # 通用函数, 返回INSERT、UPDATE、DELETE这3种SQL的执行所影响的行数
 async def execute(sql, args):
@@ -74,9 +74,10 @@ class ModelMetaclass(type):
     # bases: 类继承的父类集合 Tuple
     # attrs: 类的方法集合
     def __new__(cls, name, bases, attrs):
-        # 排出Model类本身,返回它自己
+        # 排除对 Model 类的修改
         if name == 'Model':
             return type.__new__(cls, name, bases, attrs)
+        print('Found model: {}'.format(name))
         # 获取table名称
         tableName = attrs.get('__table__', None) or name
         # 日志: 找到名为name的model
@@ -88,6 +89,8 @@ class ModelMetaclass(type):
 
         for k,v in attrs.items():
             if isinstance(v, Field):
+            # 找到一个Field属性,就把它保存在mappings字典中,同时从类属性中
+            # 删除该Field属性,否则会出现运行错误(实例的属性会遮盖类的同名属性)
                 logging.info('found mapping: {} ==> {}'.format(k,v))
                 mappings[k] = v
                 # 如果v.primary_key为True,这个field为主键
@@ -108,7 +111,7 @@ class ModelMetaclass(type):
 
         escaped_fields = list(map(lambda f: '`%s`' % f, fields))
         attrs['__mappings__'] = mappings # 保存属性和列的映射关系
-        attrs['__table__'] = tableName # table 名
+        attrs['__table__'] = tableName # 假设表名和类名一致
         attrs['__primary_key__'] = primaryKey # 主键属性名
         attrs['__fields__'] = fields # 除主键外的属性名
         # 构造默认的 SELECT, INSERT, UPDAT E和 DELETE 语句
@@ -202,6 +205,7 @@ class Model(dict, metaclass=ModelMetaclass):
         rows = await execute(self.__insert__, args)
         if rows != 1:
             logging.warning('failed to insert record: affected rows: {}'.format(rows))
+        print('ARGS: {}'.format(str(args)))
 
     async def update(self):
         args = list(map(self.getValue, self.__fields__))        
